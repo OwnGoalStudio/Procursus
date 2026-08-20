@@ -73,7 +73,7 @@ jobs:
             --output "$RUNNER_TEMP/procursus-bootstrap.tar.zst"
           echo "b80523843ebd8d990a204a70b403472fd66e32797f2357061b1c080f01e15aa6  $RUNNER_TEMP/procursus-bootstrap.tar.zst" | shasum -a 256 --check
           "$(brew --prefix zstd)/bin/zstd" --decompress --stdout "$RUNNER_TEMP/procursus-bootstrap.tar.zst" \
-            | sudo tar -xpf - -C /
+            | sudo tar -xpf - -C / ./opt/procursus
           sudo /opt/procursus/bin/apt-get update
           sudo /opt/procursus/bin/apt-get install -y \
             autoconf automake autopoint bash bison cmake curl docbook-xml \
