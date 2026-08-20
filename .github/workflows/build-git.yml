@@ -106,7 +106,9 @@ jobs:
           set -euo pipefail
           umask 022
           export PATH="/opt/procursus/bin:/opt/procursus/libexec/gnubin:$PATH"
-          /opt/procursus/bin/gmake -j"$(sysctl -n hw.logicalcpu)" \
+          # Procursus' downloader does not fail on mirror error pages and races
+          # parallel setup targets; serialize setup/build for reliable archives.
+          /opt/procursus/bin/gmake -j1 \
             MEMO_TARGET="${{ matrix.target }}" \
             MEMO_CFVER=1900 \
             NO_PGP=1 \
