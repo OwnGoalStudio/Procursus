@@ -90,10 +90,12 @@ jobs:
         run: |
           set -euo pipefail
           commit="7764c54759009272b4f2f23c18c62b21794fe6dd"
-          curl --fail --location --retry 3 \
-            "https://raw.githubusercontent.com/roothide/libroothide/${commit}/symredirect.cpp" \
-            --output "$RUNNER_TEMP/symredirect.cpp"
-          xcrun clang++ -std=c++11 -stdlib=libc++ \
+          for file in symredirect.cpp vroot.h; do
+            curl --fail --location --retry 3 \
+              "https://raw.githubusercontent.com/roothide/libroothide/${commit}/${file}" \
+              --output "$RUNNER_TEMP/${file}"
+          done
+          xcrun clang++ -std=c++11 \
             "$RUNNER_TEMP/symredirect.cpp" -o "$RUNNER_TEMP/symredirect"
           sudo install -m 0755 "$RUNNER_TEMP/symredirect" /usr/local/bin/symredirect
 
@@ -104,7 +106,7 @@ jobs:
           set -euo pipefail
           umask 022
           export PATH="/opt/procursus/bin:/opt/procursus/libexec/gnubin:$PATH"
-          /opt/procursus/bin/make -j"$(sysctl -n hw.logicalcpu)" \
+          /opt/procursus/bin/gmake -j"$(sysctl -n hw.logicalcpu)" \
             MEMO_TARGET="${{ matrix.target }}" \
             MEMO_CFVER=1900 \
             git-package
