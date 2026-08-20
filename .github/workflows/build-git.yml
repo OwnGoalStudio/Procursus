@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - "makefiles/git.mk"
+      - ".github/patches/git-shell-path.patch"
       - ".github/workflows/build-git.yml"
 
 permissions:
@@ -26,18 +27,41 @@ jobs:
       matrix:
         include:
           - variant: rootless
+            repository: OwnGoalStudio/Procursus
             ref: main
             target: iphoneos-arm64-rootless
           - variant: roothide
-            ref: roothide
+            repository: roothide/Procursus-roothide
+            ref: main
             target: iphoneos-arm64-roothide
 
     steps:
-      - name: Check out ${{ matrix.ref }}
+      - name: Check out CI configuration
         uses: actions/checkout@v4
         with:
-          ref: ${{ matrix.ref }}
+          path: ci
           persist-credentials: false
+
+      - name: Check out ${{ matrix.variant }} sources
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.ref }}
+          path: source
+          persist-credentials: false
+
+      - name: Apply shell-path fix
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          patch_file="../ci/.github/patches/git-shell-path.patch"
+          if git apply --check "$patch_file"; then
+            git apply "$patch_file"
+          else
+            git apply --reverse --check "$patch_file"
+          fi
+          grep -F 'SHELL_PATH=$(MEMO_PREFIX)$(MEMO_SUB_PREFIX)/bin/sh' makefiles/git.mk
 
       - name: Install Procursus build environment
         shell: bash
@@ -71,6 +95,7 @@ jobs:
           sudo install -m 0755 "$RUNNER_TEMP/symredirect" /usr/local/bin/symredirect
 
       - name: Build Git package
+        working-directory: source
         shell: bash
         run: |
           set -euo pipefail
@@ -82,6 +107,7 @@ jobs:
             git-package
 
       - name: Inspect package metadata
+        working-directory: source
         shell: bash
         run: |
           set -euo pipefail
@@ -94,6 +120,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: git-${{ matrix.variant }}
-          path: build_dist/**/git/*.deb
+          path: source/build_dist/**/git/*.deb
           if-no-files-found: error
           retention-days: 14
