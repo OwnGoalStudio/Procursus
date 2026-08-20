@@ -109,6 +109,7 @@ jobs:
           /opt/procursus/bin/gmake -j"$(sysctl -n hw.logicalcpu)" \
             MEMO_TARGET="${{ matrix.target }}" \
             MEMO_CFVER=1900 \
+            NO_PGP=1 \
             git-package
 
       - name: Inspect package metadata
