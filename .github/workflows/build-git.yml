@@ -20,7 +20,7 @@ concurrency:
 jobs:
   build:
     name: ${{ matrix.variant }}
-    runs-on: macos-15-intel
+    runs-on: macos-26
     timeout-minutes: 120
     strategy:
       fail-fast: false
@@ -37,13 +37,13 @@ jobs:
 
     steps:
       - name: Check out CI configuration
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: ci
           persist-credentials: false
 
       - name: Check out ${{ matrix.variant }} sources
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: ${{ matrix.repository }}
           ref: ${{ matrix.ref }}
