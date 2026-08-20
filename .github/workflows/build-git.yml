@@ -74,8 +74,11 @@ jobs:
           echo "b80523843ebd8d990a204a70b403472fd66e32797f2357061b1c080f01e15aa6  $RUNNER_TEMP/procursus-bootstrap.tar.zst" | shasum -a 256 --check
           "$(brew --prefix zstd)/bin/zstd" --decompress --stdout "$RUNNER_TEMP/procursus-bootstrap.tar.zst" \
             | sudo tar -xpf - -C / ./opt/procursus
-          sudo /opt/procursus/bin/apt-get update
-          sudo /opt/procursus/bin/apt-get install -y \
+          # The legacy bootstrap's apt-key helper does not run on current macOS.
+          # Packages are still fetched over HTTPS from the pinned bootstrap's source.
+          sudo /opt/procursus/bin/apt-get \
+            -o Acquire::AllowInsecureRepositories=true update
+          sudo /opt/procursus/bin/apt-get install -y --allow-unauthenticated \
             autoconf automake autopoint bash bison cmake curl docbook-xml \
             docbook-xsl fakeroot findutils flex gawk git gnupg grep groff \
             gzip ldid libtool make ncurses-bin openssl patch pkg-config \
