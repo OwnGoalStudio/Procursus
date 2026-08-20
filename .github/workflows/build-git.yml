@@ -1,0 +1,99 @@
+name: Build patched Git
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "makefiles/git.mk"
+      - ".github/workflows/build-git.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-git-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.variant }}
+    runs-on: macos-13
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: rootless
+            ref: main
+            target: iphoneos-arm64-rootless
+          - variant: roothide
+            ref: roothide
+            target: iphoneos-arm64-roothide
+
+    steps:
+      - name: Check out ${{ matrix.ref }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.ref }}
+          persist-credentials: false
+
+      - name: Install Procursus build environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install zstd
+          curl --fail --location --retry 3 \
+            https://apt.procurs.us/bootstraps/big_sur/bootstrap-darwin-amd64.tar.zst \
+            --output "$RUNNER_TEMP/procursus-bootstrap.tar.zst"
+          echo "b80523843ebd8d990a204a70b403472fd66e32797f2357061b1c080f01e15aa6  $RUNNER_TEMP/procursus-bootstrap.tar.zst" | shasum -a 256 --check
+          "$(brew --prefix zstd)/bin/zstd" --decompress --stdout "$RUNNER_TEMP/procursus-bootstrap.tar.zst" \
+            | sudo tar -xpf - -C /
+          sudo /opt/procursus/bin/apt-get update
+          sudo /opt/procursus/bin/apt-get install -y \
+            autoconf automake autopoint bash bison cmake curl docbook-xml \
+            docbook-xsl fakeroot findutils flex gawk git gnupg grep groff \
+            gzip ldid libtool make ncurses-bin openssl patch pkg-config \
+            po4a python3 sed tar triehash xz-utils zstd
+
+      - name: Install Roothide host rewriter
+        if: matrix.variant == 'roothide'
+        shell: bash
+        run: |
+          set -euo pipefail
+          commit="7764c54759009272b4f2f23c18c62b21794fe6dd"
+          curl --fail --location --retry 3 \
+            "https://raw.githubusercontent.com/roothide/libroothide/${commit}/symredirect.cpp" \
+            --output "$RUNNER_TEMP/symredirect.cpp"
+          xcrun clang++ -std=c++11 -stdlib=libc++ \
+            "$RUNNER_TEMP/symredirect.cpp" -o "$RUNNER_TEMP/symredirect"
+          sudo install -m 0755 "$RUNNER_TEMP/symredirect" /usr/local/bin/symredirect
+
+      - name: Build Git package
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 022
+          export PATH="/opt/procursus/bin:/opt/procursus/libexec/gnubin:$PATH"
+          /opt/procursus/bin/make -j"$(sysctl -n hw.logicalcpu)" \
+            MEMO_TARGET="${{ matrix.target }}" \
+            MEMO_CFVER=1900 \
+            git-package
+
+      - name: Inspect package metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          deb="$(find build_dist -type f -path '*/git/*.deb' -print -quit)"
+          test -n "$deb"
+          /opt/procursus/bin/dpkg-deb --info "$deb"
+          /opt/procursus/bin/dpkg-deb --contents "$deb"
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: git-${{ matrix.variant }}
+          path: build_dist/**/git/*.deb
+          if-no-files-found: error
+          retention-days: 14
